@@ -1,21 +1,16 @@
-# VRM Optimization Tools
+# VRM Optimization 
 
-## Your VRM was 60% too large!
+> NOTE: These scrips were created with Claude, please validate the structure of the optimized VRM separately before using in production!
 
-**Original file:** 14.17 MB  
-**Optimized file:** 5.62 MB  
-**Reduction:** 60.7% smaller
+## Pre-requisites 
 
-The problem was **massive 4096x4096 PNG textures** eating up ~9MB. This causes stuttering in React Three Fiber and three-vrm because the browser has to decode huge PNGs before uploading to the GPU.
+**Python3**
+https://www.python.org/downloads/
 
-**NOTE:** The included optimized.vrm file has been fixed to work with the pixiv three-vrm viewer. The issue was that the GLB binary chunk length MUST be 4-byte aligned (divisible by 4). The chunk length now includes padding bytes to ensure proper alignment, which is required by the glTF 2.0 specification.
-
-## What was done:
-- ✅ Resized textures from 4096x4096 → 1024x1024
-- ✅ Converted PNGs to JPEG (85% quality) where no alpha channel needed
-- ✅ Kept PNG for textures with transparency
-- ✅ Validated VRM structure stays intact
-- ✅ Confirmed three-vrm compatibility
+**Pillow**
+```bash
+pip install Pillow
+```
 
 ## Scripts Included
 
@@ -80,12 +75,6 @@ python3 validate_vrm.py file.vrm
 
 That's why this script uses PNG/JPEG only - three-vrm doesn't support newer formats like KTX2 or Basis Universal yet.
 
-## Requirements
-
-```bash
-pip install Pillow
-```
-
 That's it! Only needs PIL/Pillow for image processing. Uses Python's built-in libraries for everything else.
 
 ## Troubleshooting
@@ -139,18 +128,7 @@ python3 optimize_vrm.py input.vrm output.vrm 2048 95
 # Results in ~8-12MB files
 ```
 
-## Why Your Original VRM Was So Big
-
-Your VRM had:
-- Texture 0: 4096x4096 PNG → 1.1 MB
-- Texture 1: 4096x4096 PNG → 3.8 MB (main body)
-- Texture 2: 4096x4096 PNG → 3.2 MB (clothing)
-- Texture 3: 1024x1024 PNG → 0.9 MB
-- Texture 4: 300x54 PNG → 0.005 MB
-
-**Total texture size: 9.1 MB out of 14.2 MB**
-
-Most VRMs use 1024x1024 or even 512x512 textures. 4096x4096 is overkill for real-time rendering and causes:
+Most VRMs use 1024x1024 or even 512x512 textures. Large textures are overkill for real-time rendering and causes:
 - Slow loading times
 - High memory usage
 - GPU texture upload stutters
