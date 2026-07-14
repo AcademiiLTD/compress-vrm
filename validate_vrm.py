@@ -112,7 +112,7 @@ def validate_vrm(filepath):
                 print(f"✓ {len(json_data['images'])} images/textures")
                 for idx, img in enumerate(json_data['images']):
                     mime = img.get('mimeType', 'unknown')
-                    if mime not in ['image/png', 'image/jpeg', 'image/jpg']:
+                    if mime not in ['image/png', 'image/jpeg', 'image/jpg', 'image/ktx2']:
                         print(f"⚠️  WARNING: Texture {idx} has unusual MIME type: {mime}")
                     if 'bufferView' in img:
                         bv_idx = img['bufferView']
@@ -132,19 +132,78 @@ def validate_vrm(filepath):
             
             # Check for three-vrm compatibility
             print("\nthree-vrm compatibility checks:")
-            
+
             if 'images' in json_data:
                 unsupported = []
+                ktx2_images = []
                 for idx, img in enumerate(json_data['images']):
                     mime = img.get('mimeType', '')
-                    if mime not in ['image/png', 'image/jpeg', 'image/jpg']:
+                    if mime == 'image/ktx2':
+                        ktx2_images.append(idx)
+                    elif mime not in ['image/png', 'image/jpeg', 'image/jpg']:
                         unsupported.append((idx, mime))
-                
+
                 if unsupported:
                     print(f"⚠️  Unsupported texture formats found:")
                     for idx, mime in unsupported:
                         print(f"   Texture {idx}: {mime}")
-                    print("   three-vrm supports: image/png, image/jpeg")
+                    print("   Supported: image/png, image/jpeg, and configured KTX2")
+                elif ktx2_images:
+                    extensions_used = json_data.get('extensionsUsed', [])
+                    extensions_required = json_data.get('extensionsRequired', [])
+                    if 'KHR_texture_basisu' not in extensions_used:
+                        print("❌ FAIL: KTX2 images require KHR_texture_basisu in extensionsUsed")
+                        return False
+                    referenced_ktx2 = set()
+                    has_ktx2_only_texture = False
+                    for texture_index, texture in enumerate(json_data.get('textures', [])):
+                        basisu = texture.get('extensions', {}).get('KHR_texture_basisu')
+                        if basisu is None:
+                            continue
+                        source = basisu.get('source')
+                        if (
+                            not isinstance(source, int)
+                            or source < 0
+                            or source >= len(json_data['images'])
+                        ):
+                            print(
+                                f"❌ FAIL: Texture {texture_index} has an invalid "
+                                "KHR_texture_basisu source"
+                            )
+                            return False
+                        if json_data['images'][source].get('mimeType') != 'image/ktx2':
+                            print(
+                                f"❌ FAIL: Texture {texture_index} KHR_texture_basisu "
+                                "source is not image/ktx2"
+                            )
+                            return False
+                        if 'source' not in texture:
+                            has_ktx2_only_texture = True
+                        referenced_ktx2.add(source)
+
+                    if (
+                        has_ktx2_only_texture
+                        and 'KHR_texture_basisu' not in extensions_required
+                    ):
+                        print(
+                            "❌ FAIL: KTX2-only textures require KHR_texture_basisu "
+                            "in extensionsRequired"
+                        )
+                        return False
+                    if not has_ktx2_only_texture:
+                        print("✓ KTX2 textures provide core PNG/JPEG fallbacks")
+
+                    missing = set(ktx2_images) - referenced_ktx2
+                    if missing:
+                        print(
+                            "❌ FAIL: KTX2 image(s) are not referenced by "
+                            f"KHR_texture_basisu: {sorted(missing)}"
+                        )
+                        return False
+                    print(
+                        "✓ KTX2/Basis textures are valid; configure GLTFLoader "
+                        "with KTX2Loader"
+                    )
                 else:
                     print("✓ All textures use supported formats (PNG/JPEG)")
             
